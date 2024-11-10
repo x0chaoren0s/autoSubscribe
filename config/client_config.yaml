@@ -1,0 +1,69 @@
+# 代理结果文件配置
+proxy_results:
+  # 站点名称: 结果文件路径
+  "91mh01.xyz": "results/91mh01.xyz.txt"
+  "www.wnacg.com": "results/www.wnacg.com.txt"
+
+# Xray本地监听配置
+inbounds:
+  # SOCKS5入站
+  - protocol: "socks"
+    tag: "socks-in"
+    port: 1080  # 本地SOCKS5端口
+    listen: "127.0.0.1"  # 只监听本地
+    settings:
+      auth: "noauth"
+      udp: true
+      
+  # HTTP入站
+  - protocol: "http"
+    tag: "http-in"
+    port: 1081  # 本地HTTP端口
+    listen: "127.0.0.1"  # 只监听本地
+    
+  # 局域网SOCKS5入站
+  - protocol: "socks"
+    tag: "lan-socks-in"
+    port: 1082  # 局域网SOCKS5端口
+    listen: "0.0.0.0"  # 监听所有接口
+    settings:
+      auth: "password"  # 启用密码认证
+      accounts:
+        - user: "lanuser"
+          pass: "lanpass"
+      udp: true
+
+# DNS配置
+dns:
+  servers:
+    - "1.1.1.1"  # Cloudflare DNS
+    - "8.8.8.8"  # Google DNS
+    - address: "114.114.114.114"  # 国内DNS
+      port: 53
+      domains: ["geosite:cn"]
+  queryStrategy: "UseIPv4"
+
+# 路由配置
+routing:
+  # 域名解析策略
+  domainStrategy: "IPOnDemand"
+  # 规则配置
+  rules:
+    # 广告域名走block
+    - type: "field"
+      domain: ["geosite:category-ads-all"]
+      outboundTag: "block"
+    # 中国大陆域名走直连
+    - type: "field"
+      domain: ["geosite:cn"]
+      outboundTag: "direct"
+    # 中国大陆IP走直连
+    - type: "field"
+      ip: ["geoip:cn", "geoip:private"]
+      outboundTag: "direct"
+
+# 其他设置
+settings:
+  xray_path: "/usr/local/bin/xray"  # xray可执行文件路径
+  log_level: "warning"  # 日志级别
+  allow_insecure: true  # 允许不安全的证书 

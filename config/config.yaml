@@ -1,0 +1,91 @@
+subscription_urls:
+  # barry-far的源（每10分钟更新）
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub1.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub2.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub3.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub4.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub5.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub6.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub7.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub8.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub9.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub10.txt"
+  - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub11.txt"
+  - "https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/server.txt"
+  - "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"
+  - "https://mangaharb.fun:7643/v2ray/available_links.txt"
+
+fetcher:
+  timeout: 30  # 获取订阅内容的超时时间
+  max_retries: 3  # 最大重试次数
+  proxy: "socks5://localhost:7624"  # 用于访问被墙源的代理
+  headers:  # 自定义请求头
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    "Accept-Language": "en-US,en;q=0.5"
+
+tcp_tester:
+  timeout: 2  # TCP连接超时时间（秒）
+  retry_times: 2  # TCP连接重试次数
+
+target_hosts:
+  91mh01.xyz:
+    display_name: "91mh01"  # 添加显示名称
+    test_url: "http://91mh01.xyz"
+    status_codes:
+      success:
+        - 200
+        - 503
+        - 500
+        - 502
+        - 504
+      retry:
+        - 429
+        - 520
+        - 521
+        - 522
+    timeout: 3
+    retry_times: 2
+    headers:
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+      "Referer": "http://91mh01.xyz"
+    expected_pattern: "<title>.*</title>"
+  
+  www.wnacg.com:
+    display_name: "wnacg"  # 添加显示名称
+    test_url: "http://www.wnacg.com"
+    status_codes:
+      success:
+        - 200
+        - 503
+        - 500
+        - 502
+        - 504
+      retry:
+        - 429
+        - 520
+        - 521
+        - 522
+    timeout: 3
+    retry_times: 2
+    headers:
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+      "Referer": "http://www.wnacg.com"
+    expected_pattern: "<title>.*</title>"
+
+xray:
+  path: "/usr/local/bin/xray"  # xray可执行文件路径
+  timeout: 10  # xray进程超时时间
+  log_level: "warning"  # xray日志级别
+  allow_insecure: true  # 允许不安全的TLS证书
+  concurrent_tests: 50  # 增加并发测试数量
+
+output:
+  dir: "results"  # 输出目录
+  backup_dir: "results/backup"  # 备份目录
+  backup_format: "%Y%m%d_%H%M%S"  # 备份目录的时间戳格式
+  file_format: "%Y-%m-%d %H:%M:%S"  # 文件内时间戳格式
