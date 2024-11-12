@@ -1,57 +1,61 @@
 import asyncio
-import socket
+from typing import Optional, Dict
 from .base_tester import BaseTester
 from ..models.proxy import Proxy
+from ..utils.constants import SUPPORTED_PROTOCOLS
 
 class TCPTester(BaseTester):
     """TCP连接测试器"""
     
-    def __init__(self, logger=None, timeout: float = 3, retry_times: int = 2):
-        super().__init__(logger)
-        self.timeout = timeout
-        self.retry_times = retry_times
+    @classmethod
+    def get_tester_name(cls) -> str:
+        return "tcp_tester"
     
-    async def test(self, proxy: Proxy, target_host: str = None) -> bool:
-        """测试TCP连接是否可用"""
+    def __init__(self, logger=None, config: Dict = None):
+        super().__init__(logger, config)
+    
+    async def test(self, proxy: Proxy, target_host: Optional[str] = None) -> bool:
+        """
+        测试TCP连接是否可用
+        
+        Args:
+            proxy: 要测试的代理
+            target_host: 目标主机（可选）
+            
+        Returns:
+            bool: 连接成功返回True，否则返回False
+        """
+        if not self.is_enabled():
+            return True  # 如果测试器被禁用，直接返回成功
+            
         for attempt in range(self.retry_times):
             try:
-                # 创建future对象
-                future = self._tcp_connect(proxy.server, proxy.port)
-                # 等待连接完成或超时
-                await asyncio.wait_for(future, timeout=self.timeout)
+                # 创建TCP连接
+                _, writer = await asyncio.wait_for(
+                    asyncio.open_connection(proxy.server, proxy.port),
+                    timeout=self.connect_timeout
+                )
+                
+                # 关闭连接
+                writer.close()
+                await writer.wait_closed()
+                
                 if self.logger:
-                    self.logger.debug(f"TCP connection successful to {proxy.server}:{proxy.port}")
+                    self.logger.debug(f"TCP connection successful: {proxy.server}:{proxy.port}")
                 return True
                 
-            except (asyncio.TimeoutError, ConnectionRefusedError, socket.gaierror) as e:
+            except asyncio.TimeoutError:
                 if self.logger:
-                    self.logger.debug(f"TCP connection attempt {attempt + 1} failed to {proxy.server}:{proxy.port}: {str(e)}")
-                    
-                # 如果不是最后一次尝试，等待一下再重试
+                    self.logger.debug(f"TCP connection timeout: {proxy.server}:{proxy.port}")
                 if attempt < self.retry_times - 1:
-                    wait_time = 2 ** attempt  # 指数退避
-                    if self.logger:
-                        self.logger.debug(f"Waiting {wait_time}s before retry")
-                    await asyncio.sleep(wait_time)
-                    
+                    await asyncio.sleep(2 ** attempt)  # 指数退避
+                continue
+                
             except Exception as e:
                 if self.logger:
-                    self.logger.debug(f"Unexpected error during TCP connection attempt {attempt + 1} to {proxy.server}:{proxy.port}: {str(e)}")
-                    
-                # 如果不是最后一次尝试，等待一下再重试
+                    self.logger.debug(f"TCP connection failed: {proxy.server}:{proxy.port} - {str(e)}")
                 if attempt < self.retry_times - 1:
-                    wait_time = 2 ** attempt  # 指数退避
-                    if self.logger:
-                        self.logger.debug(f"Waiting {wait_time}s before retry")
-                    await asyncio.sleep(wait_time)
+                    await asyncio.sleep(2 ** attempt)  # 指数退避
+                continue
         
         return False
-
-    async def _tcp_connect(self, server: str, port: int):
-        """异步TCP连接"""
-        loop = asyncio.get_event_loop()
-        await loop.create_connection(
-            lambda: asyncio.Protocol(),
-            server,
-            port
-        )

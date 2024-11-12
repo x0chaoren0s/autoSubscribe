@@ -6,4 +6,10 @@ from .trojan_parser import TrojanParser
 from .ssh_parser import SSHParser
 
 # 导出所有解析器类
-__all__ = ['VmessParser', 'VlessParser', 'SSParser', 'TrojanParser', 'SSHParser'] 
+__all__ = [
+    'VmessParser',
+    'VlessParser',
+    'SSParser',
+    'TrojanParser',
+    'SSHParser'
+] 

@@ -3,6 +3,7 @@ from typing import List
 from .base_parser import BaseParser
 from .line_parser import LineParser
 from ..models.proxy import Proxy
+from ..utils.constants import SUPPORTED_PROTOCOLS
 
 class Base64Parser(BaseParser):
     """Base64编码内容的解析器"""
@@ -14,7 +15,7 @@ class Base64Parser(BaseParser):
         Args:
             logger: 日志记录器
         """
-        self.logger = logger
+        super().__init__(logger)
         # 使用LineParser来处理解码后的内容
         self.line_parser = LineParser(logger=logger)
     
@@ -47,7 +48,8 @@ class Base64Parser(BaseParser):
             
             # 检查是否包含代理链接
             has_proxy = any(
-                line.strip().startswith(('ss://', 'vmess://', 'vless://', 'trojan://', 'ssh://'))
+                line.strip().startswith(f"{protocol}://")
+                for protocol in SUPPORTED_PROTOCOLS
                 for line in decoded.splitlines()
                 if line.strip()
             )
@@ -61,7 +63,8 @@ class Base64Parser(BaseParser):
             try:
                 double_decoded = base64.b64decode(decoded).decode('utf-8')
                 return any(
-                    line.strip().startswith(('ss://', 'vmess://', 'vless://', 'trojan://', 'ssh://'))
+                    line.strip().startswith(f"{protocol}://")
+                    for protocol in SUPPORTED_PROTOCOLS
                     for line in double_decoded.splitlines()
                     if line.strip()
                 )
@@ -97,7 +100,8 @@ class Base64Parser(BaseParser):
             
             # 检查是否包含代理链接
             has_proxy = any(
-                line.strip().startswith(('ss://', 'vmess://', 'vless://', 'trojan://', 'ssh://'))
+                line.strip().startswith(f"{protocol}://")
+                for protocol in SUPPORTED_PROTOCOLS
                 for line in decoded.splitlines()
                 if line.strip()
             )
@@ -113,7 +117,13 @@ class Base64Parser(BaseParser):
                         self.logger.error(f"Failed to decode double base64: {str(e)}")
             
             # 3. 使用LineParser解析解码后的内容
-            return self.line_parser.parse(decoded)
+            proxies = self.line_parser.parse(decoded)
+            
+            # 4. 清理代理设置
+            for proxy in proxies:
+                proxy.clean_settings()
+            
+            return proxies
             
         except Exception as e:
             if self.logger:

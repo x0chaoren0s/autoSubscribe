@@ -4,29 +4,66 @@
 
 ## 功能特点
 
-- 支持多种代理协议（VMess、VLESS、Trojan、Shadowsocks）
-- 支持多个订阅源
-- 支持TCP和Xray双重测试
-- 支持多站点专用代理筛选
-- 支持结果自动备份
-- 支持自定义配置
+- 自动获取和解析订阅源
+- 支持多种代理协议
+- 自动测试代理可用性
+- 自动生成配置文件
+- 支持站点专用代理分组
+- 支持自动备份
+- 支持Xray和Glider两种客户端
 
-## 安装要求
+## 支持的协议和加密方法
 
-- Python 3.8+
-- Xray-core
+### Shadowsocks
+支持的加密方法：
+- aes-128-gcm
+- aes-256-gcm
+- chacha20-poly1305
+- chacha20-ietf-poly1305
+- xchacha20-poly1305
+- 2022-blake3-aes-128-gcm
+- 2022-blake3-aes-256-gcm
+- 2022-blake3-chacha20-poly1305
 
-### Python依赖
+注意：不再支持以下旧的加密方法：
+- aes-128-ctr
+- aes-192-ctr
+- aes-256-ctr
+- aes-128-cfb
+- aes-192-cfb
+- aes-256-cfb
+- rc4-md5
+- chacha20
+- chacha20-ietf
 
-```bash
-pip install -r requirements.txt
-```
+### VMess
+- 支持 TCP、WebSocket、HTTP、gRPC 传输
+- 支持 TLS、Reality 安全传输
+- 支持 alterID 设置
 
-### Xray安装
+### VLESS
+- 支持 TCP、WebSocket、HTTP、gRPC 传输
+- 支持 TLS、Reality 安全传输
+- 支持 XTLS 流控
 
-```bash
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
-```
+### Trojan
+- 支持 TCP、WebSocket 传输
+- 支持 TLS 安全传输
+
+### SSH
+- 支持密码认证
+- 支持密钥认证
+- 支持自定义SSH选项
+- 链接格式：
+  ```
+  ssh://[username[:password]@]hostname[:port][?key=private_key_path&key_password=key_password&ssh_Option1=Value1&ssh_Option2=Value2]
+  ```
+- 示例：
+  ```
+  ssh://user:pass@example.com:22
+  ssh://example.com?key=/path/to/key
+  ssh://user@example.com?ssh_ServerAliveInterval=60
+  ```
 
 ## 使用方法
 
@@ -41,7 +78,7 @@ bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release
 ### 2. 代理清洗
 
 ```bash
-python main.py
+python autoSubscribe.py --filter_subscriptions
 ```
 
 这将：
@@ -50,83 +87,51 @@ python main.py
 - 对每个站点进行可用性测试
 - 保存测试结果到results目录
 
-### 3. 启动Xray客户端
+### 3. 生成代理配置
 
+生成Xray配置：
 ```bash
-python tools/run_xray_client.py
+python autoSubscribe.py --generate_xray_config
+```
+
+启动Xray：
+```bash
+xray -c config/xray_client.json
+```
+
+生成Glider配置：
+```bash
+python autoSubscribe.py --generate_glider_config
+```
+
+启动Glider：
+```bash
+glider -config config/glider.conf
 ```
 
 这将：
 - 加载已测试的代理
-- 生成Xray配置
-- 提供多个入站端口
-- 自动进行负载均衡
-
-## 配置文件说明
-
-### config/config.yaml
-
-主配置文件，包含：
-- 订阅源列表
-- 测试参数设置
-- 目标站点配置
-- 输出设置
-
-### config/client_config.yaml
-
-客户端配置文件，包含：
-- 代理结果文件位置
-- Xray入站设置（支持多个）
-- DNS设置
-- 路由规则配置
+- 生成相应的配置文件
+- 显示入站端口和路由规则
+- 提供启动命令
 
 ## 路由规则
 
 优先级从高到低：
-1. 广告域名 -> 阻止
-2. 目标站点 -> 专用代理
+1. 目标站点 -> 专用代理（每个站点使用其专用代理组）
+2. 广告域名 -> 阻止
 3. 中国大陆域名 -> 直连
 4. 中国大陆IP -> 直连
-5. 其他流量 -> 所有代理负载均衡
-
-## 目录结构
-
-```
-autoSubscribe/
-├── config/                 # 配置文件目录
-├── logs/                  # 日志文件目录
-├── results/               # 代理结果目录
-├── src/                   # 源代码目录
-└── tools/                 # 工具脚本目录
-```
+5. 其他流量 -> 所有代理负载均衡（自动选择延迟最低的代理）
 
 ## 注意事项
 
-1. 首次运行前请确保配置文件正确
-2. 建议定期清理备份目录
-3. 可以通过修改配置文件调整并发数和超时时间
-4. 日志文件会自动按日期归档
-5. 每次运行会自动备份之前的结果
-
-## 故障排除
-
-1. 如果无法获取订阅源，检查fetcher配置中的代理设置
-2. 如果测试速度太慢，可以增加concurrent_tests的值
-3. 如果出现连接超时，可以调整timeout参数
-4. 如果需要调试，可以查看logs目录下的日志文件
-
-## 许可证
-
-MIT License
-
-## 贡献
-
-欢迎提交Issue和Pull Request！
-
-## 更新日志
-
-### v1.0.0
-- 初始版本发布
-- 支持多协议
-- 支持多站点测试
-- 支持自动备份
+- SSH代理不会包含在Xray配置中，需要使用SSH客户端单独连接
+- 建议对SSH代理使用密钥认证以提高安全性
+- SSH代理支持的选项可以在链接中通过ssh_前缀设置
+- Glider提供更好的负载均衡功能，建议优先使用Glider配置
+- Glider支持的负载均衡策略：
+  - rr: 轮询（Round Robin）
+  - ha: 高可用（High Availability）
+  - lha: 基于延迟的高可用（Latency based High Availability）
+  - dh: 目标地址哈希（Destination Hashing）

@@ -4,21 +4,31 @@ proxy_results:
   "91mh01.xyz": "results/91mh01.xyz.txt"
   "www.wnacg.com": "results/www.wnacg.com.txt"
 
-# Xray本地监听配置
+# 目标站点配置
+target_hosts:
+  "91mh01.xyz":
+    display_name: "91mh01"
+  "www.wnacg.com":
+    display_name: "wnacg"
+
+# 入站配置
 inbounds:
-  # SOCKS5入站
+  # 主SOCKS5入站
   - protocol: "socks"
     tag: "socks-in"
-    port: 1080  # 本地SOCKS5端口
+    port: 1080  # 主SOCKS5端口
     listen: "127.0.0.1"  # 只监听本地
     settings:
       auth: "noauth"
       udp: true
-      
-  # HTTP入站
+      sniffing:
+        enabled: true
+        destOverride: ["http", "tls", "quic"]
+    
+  # 主HTTP入站
   - protocol: "http"
     tag: "http-in"
-    port: 1081  # 本地HTTP端口
+    port: 1081  # 主HTTP端口
     listen: "127.0.0.1"  # 只监听本地
     
   # 局域网SOCKS5入站
@@ -32,6 +42,9 @@ inbounds:
         - user: "lanuser"
           pass: "lanpass"
       udp: true
+      sniffing:
+        enabled: true
+        destOverride: ["http", "tls", "quic"]
 
 # DNS配置
 dns:
@@ -40,30 +53,51 @@ dns:
     - "8.8.8.8"  # Google DNS
     - address: "114.114.114.114"  # 国内DNS
       port: 53
-      domains: ["geosite:cn"]
-  queryStrategy: "UseIPv4"
-
-# 路由配置
-routing:
-  # 域名解析策略
-  domainStrategy: "IPOnDemand"
-  # 规则配置
-  rules:
-    # 广告域名走block
-    - type: "field"
-      domain: ["geosite:category-ads-all"]
-      outboundTag: "block"
-    # 中国大陆域名走直连
-    - type: "field"
-      domain: ["geosite:cn"]
-      outboundTag: "direct"
-    # 中国大陆IP走直连
-    - type: "field"
-      ip: ["geoip:cn", "geoip:private"]
-      outboundTag: "direct"
+      domains: ["geosite:cn"]  # 国内域名
+    - address: "223.5.5.5"     # 阿里DNS
+      port: 53
+      domains: ["geosite:cn"]  # 国内域名
+    - address: "119.29.29.29"  # 腾讯DNS
+      port: 53
+      domains: ["geosite:cn"]  # 国内域名
+  queryStrategy: "UseIPv4"  # 优先使用IPv4
+  disableCache: false      # 启用DNS缓存
+  disableFallback: false   # 启用DNS回退
 
 # 其他设置
 settings:
+  # Xray设置
   xray_path: "/usr/local/bin/xray"  # xray可执行文件路径
-  log_level: "warning"  # 日志级别
-  allow_insecure: true  # 允许不安全的证书 
+  xray_log_level: "warning"         # xray日志级别
+  
+  # Glider设置
+  glider_path: "/usr/local/bin/glider"  # glider可执行文件路径
+  glider_verbose: true                  # 是否启用详细日志
+  glider_strategy: "lha"                # 负载均衡策略 (rr/ha/lha/dh)
+  glider_check_interval: 30             # 检查间隔（秒）
+  glider_check_timeout: 10              # 检查超时（秒）
+  glider_max_failures: 3                # 最大失败次数
+  glider_concurrent_tests: 5            # 并发测试数量
+  glider_check_url: "http://www.msftconnecttest.com/connecttest.txt"  # 检查URL
+  glider_check_expect: "200"            # 期望的响应
+  glider_dns_timeout: 3                 # DNS查询超时（秒）
+  glider_dns_cache_size: 4096           # DNS缓存大小
+  glider_dns_max_ttl: 1800             # DNS最大TTL（秒）
+  glider_dns_min_ttl: 0                # DNS最小TTL（秒）
+  glider_dns_always_tcp: false         # 是否总是使用TCP查询DNS
+  glider_dns_no_aaaa: true            # 是否禁用AAAA查询
+  glider_tcp_buf_size: 32768          # TCP缓冲区大小（字节）
+  glider_udp_buf_size: 2048           # UDP缓冲区大小（字节）
+  glider_relay_timeout: 0             # 转发超时（秒，0表示不限制）
+  glider_dial_timeout: 3              # 连接超时（秒）
+
+  # 通用设置
+  log_level: "warning"              # 日志级别
+  connect_timeout: 5                # 连接超时（秒）
+  read_timeout: 10                  # 读取超时（秒）
+  write_timeout: 10                 # 写入超时（秒）
+  test_timeout: 10                  # 测试超时（秒）
+  retry_times: 2                    # 重试次数
+  concurrent_tests: 5               # 并发测试数
+  tls_fingerprint: "chrome"         # TLS指纹
+  alpn: ["h2", "http/1.1"]         # ALPN协议

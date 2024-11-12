@@ -1,7 +1,15 @@
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from .base_protocol_parser import BaseProtocolParser
 from ...models.proxy import Proxy
 from .protocol_parser_factory import ProtocolParserFactory
+from ...utils.string_cleaner import StringCleaner
+from ...utils.constants import (
+    DEFAULT_VALUES,
+    SPECIAL_CHARS,
+    CLEAN_FIELDS,
+    DEFAULT_PORTS,
+    SSH_OPTIONS
+)
 
 @ProtocolParserFactory.register
 class SSHParser(BaseProtocolParser):
@@ -43,12 +51,23 @@ class SSHParser(BaseProtocolParser):
                 if self.logger:
                     self.logger.debug("Using default SSH port 22")
             
+            # 解析查询参数
+            query_params = parse_qs(parsed.query)
+            
+            # 使用StringCleaner处理设置
             settings = {
-                'username': username,
+                'username': StringCleaner.clean_value(username, 'username'),
                 'password': password,
-                'private_key': parsed.query.get('key', ''),
-                'private_key_password': parsed.query.get('key_password', '')
+                'private_key': StringCleaner.clean_value(query_params.get('key', [''])[0], 'private_key'),
+                'private_key_password': StringCleaner.clean_value(query_params.get('key_password', [''])[0], 'private_key_password'),
+                'options': {}
             }
+            
+            # 处理SSH选项
+            for key, value in query_params.items():
+                if key.startswith('ssh_'):
+                    option_name = key[4:]  # 移除'ssh_'前缀
+                    settings['options'][option_name] = StringCleaner.clean_value(value[0], option_name)
             
             proxy = Proxy(
                 raw_link=line,
@@ -60,11 +79,10 @@ class SSHParser(BaseProtocolParser):
             
             if self.logger:
                 self.logger.debug(f"Successfully parsed SSH proxy: {server}:{port}")
-                self.logger.debug(f"Settings: {settings}")
             
             return proxy
             
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Failed to parse SSH link: {str(e)}")
-            raise ValueError(f"Invalid SSH link: {str(e)}") 
+            raise ValueError(f"Invalid SSH link: {str(e)}")

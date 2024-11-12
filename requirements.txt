@@ -1,5 +1,7 @@
 # HTTP请求
 aiohttp>=3.8.0
+aiosocks>=0.2.6
+aiofiles>=23.1.0
 
 # YAML配置文件支持
 pyyaml>=6.0.0
@@ -7,6 +9,30 @@ pyyaml>=6.0.0
 # 类型提示支持
 typing-extensions>=4.5.0
 
+# SSH支持
+asyncssh>=2.13.1
+cryptography>=41.0.0  # asyncssh的依赖
+
+# DNS解析
+dnspython>=2.4.0
+
+# 进度条支持
+tqdm>=4.65.0
+
+# 日志格式化
+colorama>=0.4.6
+
 # 测试框架（可选）
 pytest>=7.3.1
 pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# 代码质量工具（可选）
+black>=23.7.0
+isort>=5.12.0
+flake8>=6.1.0
+mypy>=1.5.1
+
+# 其他工具
+psutil>=5.9.0  # 用于进程管理
+python-dateutil>=2.8.2  # 用于日期处理

@@ -3,6 +3,14 @@ import base64
 from .base_protocol_parser import BaseProtocolParser
 from ...models.proxy import Proxy
 from .protocol_parser_factory import ProtocolParserFactory
+from ...utils.string_cleaner import StringCleaner
+from ...utils.constants import (
+    DEFAULT_VALUES,
+    SPECIAL_CHARS,
+    CLEAN_FIELDS,
+    DEFAULT_PORTS,
+    TLS_FINGERPRINTS
+)
 
 @ProtocolParserFactory.register
 class VmessParser(BaseProtocolParser):
@@ -32,18 +40,24 @@ class VmessParser(BaseProtocolParser):
                 # 提取必要字段
                 server = config.get('add', '')
                 port = int(config.get('port', 0))
+                
+                # 使用StringCleaner处理所有设置
                 settings = {
                     'id': config.get('id', ''),
                     'aid': config.get('aid', 0),
-                    'net': config.get('net', ''),
-                    'type': config.get('type', ''),
-                    'host': config.get('host', ''),
-                    'path': config.get('path', ''),
-                    'tls': config.get('tls', ''),
-                    'sni': config.get('sni', ''),
-                    'alpn': config.get('alpn', ''),
-                    'fp': config.get('fp', '')
+                    'net': StringCleaner.clean_transport(config.get('net', 'tcp')),
+                    'type': StringCleaner.clean_value(config.get('type', 'none'), 'headerType'),
+                    'host': StringCleaner.clean_host(config.get('host', ''), server),
+                    'path': StringCleaner.clean_path(config.get('path', '/')),
+                    'tls': StringCleaner.clean_security(config.get('tls', 'none'), server),
+                    'sni': StringCleaner.clean_host(config.get('sni', ''), server),
+                    'alpn': StringCleaner.clean_value(config.get('alpn', ''), 'alpn'),
+                    'fp': StringCleaner.clean_value(config.get('fp', 'chrome'), 'fp')
                 }
+                
+                # 验证必要字段
+                if not server or not settings['id']:
+                    raise ValueError("Missing required fields")
                 
                 proxy = Proxy(
                     raw_link=line,

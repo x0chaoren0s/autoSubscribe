@@ -1,6 +1,17 @@
 import json
 from typing import List, Dict
 from ..models.proxy import Proxy
+from .constants import (
+    SUPPORTED_SS_METHODS,
+    SUPPORTED_PROTOCOLS,
+    HTTP_HEADERS,
+    DEFAULT_VALUES,
+    TLS_FINGERPRINTS,
+    ALPN_PROTOCOLS,
+    CLEAN_FIELDS,
+    SPECIAL_CHARS
+)
+from .string_cleaner import StringCleaner
 
 class XrayConfigGenerator:
     """生成完整的Xray配置"""
@@ -35,29 +46,31 @@ class XrayConfigGenerator:
                 ],
                 "queryStrategy": "UseIPv4"
             }),
-            "inbounds": client_config.get('inbounds', [{
-                "tag": "socks",
-                "port": 1080,
-                "protocol": "socks",
-                "settings": {
-                    "auth": "noauth",
-                    "udp": True,
-                    "ip": "127.0.0.1"
+            "inbounds": client_config.get('inbounds', []),
+            "outbounds": [
+                # 直连出站
+                {
+                    "tag": "direct",
+                    "protocol": "freedom",
+                    "settings": {}
                 },
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": ["http", "tls", "quic"],
-                    "metadataOnly": False
+                # 拦截出站
+                {
+                    "tag": "block",
+                    "protocol": "blackhole",
+                    "settings": {}
                 }
-            }]),
-            "outbounds": [],
+            ],
             "routing": {
                 "domainStrategy": "IPOnDemand",
-                "rules": []
+                "rules": [],
+                "balancers": []  # 添加负载均衡器配置
             }
         }
         
         # 为每个站点创建专用的出站组
+        all_outbound_tags = []  # 用于收集所有代理的标签
+        
         for site, proxies in site_proxies.items():
             site_outbounds = []
             # 为站点的每个代理创建出站
@@ -66,107 +79,73 @@ class XrayConfigGenerator:
                 tag = f"{site}_{proxy.proxy_type}_{i}"
                 outbound = {
                     "tag": tag,
-                    "protocol": proxy.proxy_type,
+                    "protocol": "shadowsocks" if proxy.proxy_type == "ss" else proxy.proxy_type,
                     "settings": XrayConfigGenerator._generate_proxy_settings(proxy),
                     "streamSettings": XrayConfigGenerator._generate_stream_settings(proxy)
                 }
                 site_outbounds.append(outbound)
                 config["outbounds"].append(outbound)
+                all_outbound_tags.append(tag)
             
-            # 为站点创建负载均衡器
+            # 如果站点有代理，创建负载均衡器
             if site_outbounds:
-                balancer_outbound = {
+                balancer = {
                     "tag": f"{site}_balancer",
-                    "protocol": "balancer",
-                    "settings": {
-                        "strategy": {
-                            "type": "leastPing"
-                        },
-                        "tags": [ob["tag"] for ob in site_outbounds],
-                        "probeInterval": "10s"
+                    "selector": [f"{site}_"],  # 匹配前缀
+                    "strategy": {
+                        "type": "random"  # 使用随机策略
                     }
                 }
-                config["outbounds"].append(balancer_outbound)
-                
-                # 添加站点特定的路由规则
-                config["routing"]["rules"].append({
-                    "type": "field",
-                    "domain": [site],
-                    "balancerTag": f"{site}_balancer"
-                })
+                config["routing"]["balancers"].append(balancer)
         
-        # 添加直连出站
-        direct_outbound = {
-            "tag": "direct",
-            "protocol": "freedom",
-            "settings": {
-                "domainStrategy": "UseIPv4"
-            }
-        }
-        config["outbounds"].append(direct_outbound)
-        
-        # 添加阻止出站
-        block_outbound = {
-            "tag": "block",
-            "protocol": "blackhole",
-            "settings": {}
-        }
-        config["outbounds"].append(block_outbound)
-        
-        # 创建一个通用的负载均衡器，使用所有代理
-        all_outbound_tags = []
-        for outbound in config["outbounds"]:
-            if any(site in outbound["tag"] for site in site_proxies.keys()):
-                all_outbound_tags.append(outbound["tag"])
-        
+        # 如果有代理，创建通用负载均衡器
         if all_outbound_tags:
-            # 添加通用负载均衡器
             universal_balancer = {
                 "tag": "universal_proxy",
-                "protocol": "balancer",
-                "settings": {
-                    "strategy": {
-                        "type": "leastPing"
-                    },
-                    "tags": all_outbound_tags,
-                    "probeInterval": "10s"
+                "selector": ["91mh01_", "www.wnacg.com_"],  # 匹配所有站点的代理
+                "strategy": {
+                    "type": "random"  # 使用随机策略
                 }
             }
-            config["outbounds"].append(universal_balancer)
+            config["routing"]["balancers"].append(universal_balancer)
         
-        # 添加其他路由规则
-        config["routing"]["rules"].extend([
-            # 优先级1：阻止广告域名
-            {
-                "type": "field",
-                "domain": ["geosite:category-ads-all"],
-                "outboundTag": "block"
-            },
-            # 优先级2：每个目标站点使用其专用代理
+        # 添加路由规则（按优先级排序）
+        config["routing"]["rules"] = [
+            # 优先级1：每个目标站点使用其专用代理
             *[{
                 "type": "field",
                 "domain": [site],
                 "balancerTag": f"{site}_balancer"
             } for site in site_proxies.keys()],
+            
+            # 优先级2：阻止广告域名
+            {
+                "type": "field",
+                "domain": ["geosite:category-ads-all"],
+                "outboundTag": "block"
+            },
+            
             # 优先级3：直连中国大陆域名
             {
                 "type": "field",
                 "domain": ["geosite:cn"],
                 "outboundTag": "direct"
             },
+            
             # 优先级4：直连中国大陆IP
             {
                 "type": "field",
                 "ip": ["geoip:cn", "geoip:private"],
                 "outboundTag": "direct"
             },
+            
             # 优先级5：其他流量使用所有代理的并集
             {
                 "type": "field",
                 "network": "tcp,udp",
                 "balancerTag": "universal_proxy"
             }
-        ])
+        ]
         
         return config
     
@@ -191,7 +170,8 @@ class XrayConfigGenerator:
                     "port": proxy.port,
                     "users": [{
                         "id": proxy.settings['uuid'],
-                        "encryption": proxy.settings.get('encryption', 'none')
+                        "encryption": "none",  # VLESS必须设置为none
+                        "flow": StringCleaner.clean_value(proxy.settings.get('flow', ''), 'flow')
                     }]
                 }]
             }
@@ -204,58 +184,69 @@ class XrayConfigGenerator:
                 }]
             }
         elif proxy.proxy_type == "ss":
+            # 标准化加密方法名称
+            method = proxy.settings['method'].lower()
+            if method not in SUPPORTED_SS_METHODS:
+                raise ValueError(f"Unsupported SS encryption method: {method}")
+                
             return {
                 "servers": [{
                     "address": proxy.server,
                     "port": proxy.port,
-                    "method": proxy.settings['method'],
-                    "password": proxy.settings['password']
+                    "method": SUPPORTED_SS_METHODS[method],
+                    "password": proxy.settings['password'],
+                    "level": 0
                 }]
             }
         else:
             raise ValueError(f"Unsupported proxy type: {proxy.proxy_type}")
     
     @staticmethod
-    def _generate_stream_settings(proxy: Proxy) -> dict:
+    def _generate_stream_settings(proxy: Proxy) -> Dict:
         """生成传输层设置"""
-        transport_type = proxy.settings.get('type', 'tcp')
+        # 使用StringCleaner处理transport_type
+        transport_type = StringCleaner.clean_transport(proxy.settings.get('type', 'tcp'))
+            
+        # 使用StringCleaner处理security
+        security = StringCleaner.clean_security(proxy.settings.get('security', 'none'), proxy.server)
+            
         settings = {
             "network": transport_type,
-            "security": proxy.settings.get('security', 'none')
+            "security": security
         }
         
         # TLS设置
-        if proxy.settings.get('tls') == 'tls' or proxy.settings.get('security') == 'tls':
+        if proxy.settings.get('tls') == 'tls' or security == 'tls':
             settings["security"] = "tls"
             settings["tlsSettings"] = {
-                "serverName": proxy.settings.get('sni', proxy.server),
+                "serverName": StringCleaner.clean_host(proxy.settings.get('sni', ''), proxy.server),
                 "allowInsecure": True,
-                "fingerprint": proxy.settings.get('fp', 'chrome'),
+                "fingerprint": StringCleaner.clean_value(proxy.settings.get('fp', 'chrome'), 'fp'),
                 "alpn": ["h2", "http/1.1"]
             }
         
         # Reality设置
-        elif proxy.settings.get('security') == 'reality':
+        elif security == 'reality':
             settings["security"] = "reality"
             settings["realitySettings"] = {
-                "serverName": proxy.settings.get('sni', ''),
-                "fingerprint": proxy.settings.get('fp', 'chrome'),
-                "publicKey": proxy.settings.get('pbk', ''),
-                "shortId": proxy.settings.get('sid', ''),
-                "spiderX": proxy.settings.get('spx', '')
+                "serverName": StringCleaner.clean_host(proxy.settings.get('sni', ''), proxy.server),
+                "fingerprint": StringCleaner.clean_value(proxy.settings.get('fp', 'chrome'), 'fp'),
+                "publicKey": StringCleaner.clean_value(proxy.settings.get('pbk', ''), 'pbk'),
+                "shortId": StringCleaner.clean_value(proxy.settings.get('sid', ''), 'sid'),
+                "spiderX": StringCleaner.clean_value(proxy.settings.get('spx', ''), 'spx')
             }
         
         # 传输层设置
         if transport_type == "ws":
             settings["wsSettings"] = {
-                "path": proxy.settings.get('path', '/'),
+                "path": StringCleaner.clean_path(proxy.settings.get('path', '/')),
                 "headers": {
-                    "Host": proxy.settings.get('host', proxy.server)
+                    "Host": StringCleaner.clean_host(proxy.settings.get('host', ''), proxy.server)
                 }
             }
         elif transport_type == "grpc":
             settings["grpcSettings"] = {
-                "serviceName": proxy.settings.get('serviceName', ''),
+                "serviceName": StringCleaner.clean_value(proxy.settings.get('serviceName', ''), 'serviceName'),
                 "multiMode": proxy.settings.get('mode', 'gun') == 'multi'
             }
         elif transport_type == "tcp":
@@ -266,14 +257,8 @@ class XrayConfigGenerator:
                         "request": {
                             "version": "1.1",
                             "method": "GET",
-                            "path": [proxy.settings.get('path', '/')],
-                            "headers": {
-                                "Host": [proxy.settings.get('host', proxy.server)],
-                                "User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"],
-                                "Accept-Encoding": ["gzip, deflate"],
-                                "Connection": ["keep-alive"],
-                                "Pragma": "no-cache"
-                            }
+                            "path": [StringCleaner.clean_path(proxy.settings.get('path', '/'))],
+                            "headers": StringCleaner.clean_headers(HTTP_HEADERS, proxy.server)
                         }
                     }
                 }
@@ -284,4 +269,4 @@ class XrayConfigGenerator:
                     }
                 }
         
-        return settings 
+        return settings

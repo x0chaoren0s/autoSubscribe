@@ -1,0 +1,2 @@
+# 可用的代理
+vless://c4ce9f87-b7b1-4e49-b06c-f726be2a0f70@hajlab.ucdavis.edu:443?encryption=none&security=tls&sni=hajlab.ucdavis.edu&fp=chrome&allowInsecure=1&type=ws&host=wWw.SpEeDtEsT.NeT.ZuLa.aIr.IkCoSaLeS.iR.D662599.v12.TzZLiMitTNeW.NeT#T8912271450 
