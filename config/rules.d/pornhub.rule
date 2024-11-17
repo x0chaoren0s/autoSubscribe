@@ -1,0 +1,7 @@
+# Rules for pornhub
+domain=pornhub.com
+strategy=lha
+check=https://cn.pornhub.com/
+checkinterval=30
+
+forward=ss://chacha20-ietf-poly1305:1RWwXhwfAB5gAEozU4G2Pg@45.87.175.178:8080

@@ -1,0 +1,7 @@
+# Rules for xnxx
+domain=xnxx.com
+strategy=lha
+check=https://www.xnxx.com/
+checkinterval=30
+
+forward=ss://chacha20-ietf-poly1305:QCXDxuDlTTMD7jtgHUjIoj@beesyar.org:8080

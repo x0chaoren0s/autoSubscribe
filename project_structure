@@ -18,50 +18,30 @@ autoSubscribe/
 │   │   ├── __init__.py
 │   │   ├── base_fetcher.py    # 基础获取器
 │   │   └── http_fetcher.py    # HTTP获取器
-│   │
-│   ├── models/                # 数据模型
+│   ├── encoders/           # 新增：编码器模块
 │   │   ├── __init__.py
-│   │   └── proxy.py          # 代理模型
-│   │
-│   ├── outputs/               # 输出处理模块
+│   │   └── encoder.py
+│   ├── decoders/           # 新增：解码器模块
 │   │   ├── __init__.py
-│   │   └── file_output.py    # 文件输出处理器
-│   │
-│   ├── parsers/              # 解析器模块
-│   │   ├── protocols/        # 协议解析器
-│   │   │   ├── __init__.py
-│   │   │   ├── base_protocol_parser.py
-│   │   │   ├── protocol_parser_factory.py
-│   │   │   ├── ss_parser.py
-│   │   │   ├── trojan_parser.py
-│   │   │   ├── vless_parser.py
-│   │   │   ├── vmess_parser.py
-│   │   │   └── ssh_parser.py  # 新增SSH解析器
+│   │   └── glider_decoder.py
+│   ├── parsers/            # 更新：只保留订阅内容解析
 │   │   ├── __init__.py
-│   │   ├── base_parser.py    # 基础解析器
-│   │   ├── base64_parser.py  # Base64解析器
-│   │   └── line_parser.py    # 行解析器
-│   │
-│   ├── testers/              # 测试器模块
+│   │   ├── base_parser.py
+│   │   ├── base64_parser.py
+│   │   └── line_parser.py
+│   ├── validators/         # 新增：验证器模块
 │   │   ├── __init__.py
-│   │   ├── base_tester.py    # 基础测试器
-│   │   ├── tcp_tester.py     # TCP连接测试器
-│   │   ├── xray_tester.py    # Xray测试器
-│   │   └── ssh_tester.py     # 新增SSH测试器
-│   │
-│   └── utils/                # 工具模块
+│   │   └── proxy_validator.py
+│   └── utils/              # 更新：配置生成器
 │       ├── __init__.py
-│       ├── logger.py         # 日志工具
-│       ├── constants.py      # 常量定义
-│       └── xray_config_generator.py  # Xray配置生成器
-│
-├── tests/                     # 测试目录（可选）
-│   ├── __init__.py
-│   ├── test_parsers/         # 解析器测试
-│   ├── test_testers/         # 测试器测试
-│   └── test_utils/           # 工具测试
-│
-├── autoSubscribe.py          # 主程序入口
-├── README.md                 # 项目说明文档
-├── requirements.txt          # Python依赖包列表
-└── .gitignore               # Git忽略配置 
+│       ├── glider_config_generator.py
+│       └── xray_config_generator.py
+├── tests/
+│   ├── test_decoders/      # 新增：解码器测试
+│   ├── test_encoders/      # 新增：编码器测试
+│   ├── test_parsers/       # 更新：解析器测试
+│   ├── test_validators/    # 新增：验证器测试
+│   └── test_utils/         # 更新：配置生成器测试
+├── setup.py                # 更新：包含新模块
+├── pyproject.toml
+└── README.md 

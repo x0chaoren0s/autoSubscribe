@@ -34,12 +34,9 @@ ENV/
 Thumbs.db
 
 # 代理配置文件
-config/xray_client.json
-config/glider.conf
-config/glider_*.conf
-config/glider.pid
-config/glider.log
-config/rules.d/
+# config/glider.conf
+# config/glider_*.conf
+# config/rules.d/
 
 # SSH相关文件
 *.pem

@@ -1,0 +1,12 @@
+# Rules for github
+domain=github.com
+strategy=lha
+check=https://github.com
+checkinterval=30
+
+forward=tls://219.77.65.212:23555?serverName=juzi8186.5112233.xyz,ws://@?path=/?ed=2560fp=randomfp=chrome&host=juzi8186.5112233.xyz,vless://f775978b-6e22-41a8-ae5e-5f9779e6745f@219.77.65.212:23555
+forward=ss://aes-256-gcm:Z4ZQB7LIKEVW7H3A@58.63.250.61:15004
+forward=tls://172.66.44.233:443?serverName=aksnmaioas.pages.dev,ws://@?path=/?ed=2048&host=aksnmaioas.pages.dev,vless://38720105-063f-40f5-a5eb-f3198b9b617d@172.66.44.233:443
+forward=ss://chacha20-ietf-poly1305:1RWwXhwfAB5gAEozU4G2Pg@45.87.175.178:8080
+forward=ss://chacha20-ietf-poly1305:A5ro8FafxmuBNXGKJrLQ6x@89.185.84.185:12575
+forward=ss://chacha20-ietf-poly1305:1RWwXhwfAB5gAEozU4G2Pg@45.87.175.199:8080

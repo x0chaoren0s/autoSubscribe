@@ -1,0 +1,7 @@
+# Rules for nhentai
+domain=nhentai.net
+strategy=lha
+check=https://nhentai.net/
+checkinterval=30
+
+forward=ss://chacha20-ietf-poly1305:QCXDxuDlTTMD7jtgHUjIoj@beesyar.org:8080

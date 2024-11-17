@@ -1,15 +1,42 @@
 # 代理结果文件配置
 proxy_results:
   # 站点名称: 结果文件路径
-  "91mh01.xyz": "results/91mh01.xyz.txt"
-  "www.wnacg.com": "results/www.wnacg.com.txt"
+  "google": "results/google.txt"
+  "github": "results/github.txt"
+  "pixiv": "results/pixiv.txt" 
+  "nhentai": "results/nhentai.txt"
+  "pornhub": "results/pornhub.txt"
+  "xnxx": "results/xnxx.txt"
+  # "r34": "results/r34.txt"
+  # "iwara": "results/iwara.txt"
+  # "eh": "results/eh.txt"
 
 # 目标站点配置
 target_hosts:
-  "91mh01.xyz":
-    display_name: "91mh01"
-  "www.wnacg.com":
-    display_name: "wnacg"
+  "google":
+    check_url: "http://www.google.com"
+  "github":
+    check_url: "https://github.com"
+  "pixiv":
+    check_url: "https://pixiv.net/"
+  "nhentai":
+    check_url: "https://nhentai.net/"
+  "pornhub":
+    check_url: "https://cn.pornhub.com/"
+  "xnxx":
+    check_url: "https://www.xnxx.com/"
+  "r34":
+    check_url: "https://rule34video.com/"
+  "iwara":
+    check_url: "https://www.iwara.tv/"
+  "eh":
+    check_url: "https://e-hentai.org/"
+  # "rule34video.com":
+  #   display_name: "r34"
+  # "www.iwara.tv":
+  #   display_name: "iwara"
+  # "e-hentai.org":
+  #   display_name: "eh"
 
 # 入站配置
 inbounds:
@@ -19,7 +46,10 @@ inbounds:
     port: 1080  # 主SOCKS5端口
     listen: "127.0.0.1"  # 只监听本地
     settings:
-      auth: "noauth"
+      auth: "password"
+      accounts:
+        - user: "user"
+          pass: "pass"
       udp: true
       sniffing:
         enabled: true
@@ -101,3 +131,27 @@ settings:
   concurrent_tests: 5               # 并发测试数
   tls_fingerprint: "chrome"         # TLS指纹
   alpn: ["h2", "http/1.1"]         # ALPN协议
+
+# Glider特定配置
+glider:
+  listen: ":7630"
+  strategy: "lha"  # rr/ha/lha/dh
+  check_interval: 30
+  check_timeout: 10
+  max_failures: 3
+
+# Xray特定配置
+xray:
+  log_level: "warning"
+  routing:
+    domain_strategy: "IPIfNonMatch"
+    rules:
+      - type: field
+        domain: ["geosite:category-ads-all"]
+        outbound: "block"
+      - type: field
+        domain: ["geosite:cn"]
+        outbound: "direct"
+      - type: field
+        ip: ["geoip:cn"]
+        outbound: "direct"

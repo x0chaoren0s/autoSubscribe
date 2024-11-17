@@ -1,284 +1,388 @@
-from typing import Dict, Optional
-from ..utils.constants import (
-    SUPPORTED_PROTOCOLS,
-    SUPPORTED_SS_METHODS,
-    LEGACY_SS_METHODS,
-    DEFAULT_PORTS,
-    DEFAULT_VALUES,
-    GLIDER_STRATEGIES,
-    VMESS_METHODS,
-    VMESS_NETWORKS,
-    TLS_SETTINGS,
-    WS_SETTINGS
-)
-from ..utils.string_cleaner import StringCleaner
+import re
+import json
+import base64
+import urllib.parse
+from typing import Dict, Optional, Any
+from dataclasses import dataclass, asdict
+from enum import Enum
 
-class Proxy:
-    """代理模型"""
+class ProxyType(str, Enum):
+    SS = "ss"
+    SSR = "ssr" 
+    VMESS = "vmess"
+    VLESS = "vless"
+    TROJAN = "trojan"
+    SSH = "ssh"
+
+class ProxyParser:
+    """代理链接解析器"""
     
-    def __init__(self, raw_link: str, proxy_type: str, server: str, port: int, settings: Dict):
-        """
-        初始化代理对象
+    @staticmethod
+    def parse(raw_link: str) -> Dict[str, Any]:
+        """解析代理链接,返回代理配置字典"""
+        if not raw_link or not isinstance(raw_link, str):
+            raise ValueError("Invalid proxy link")
+            
+        # 移除空白字符
+        raw_link = raw_link.strip()
         
-        Args:
-            raw_link: 原始代理链接
-            proxy_type: 代理类型 (ss/vmess/vless/trojan/ssh)
-            server: 服务器地址
-            port: 端口号
-            settings: 代理设置
-        """
-        if proxy_type not in SUPPORTED_PROTOCOLS:
-            raise ValueError(f"Unsupported protocol: {proxy_type}")
+        # 获取代理类型
+        proxy_type = ProxyParser._get_proxy_type(raw_link)
+        if not proxy_type:
+            raise ValueError(f"Unsupported proxy type: {raw_link}")
             
-        self.raw_link = raw_link
-        self.proxy_type = proxy_type
-        self.server = server
-        self.port = port or DEFAULT_PORTS.get(proxy_type, 443)
-        self.settings = settings
+        # 根据类型解析
+        parser_map = {
+            ProxyType.SS: ProxyParser._parse_ss,
+            ProxyType.SSR: ProxyParser._parse_ssr,
+            ProxyType.VMESS: ProxyParser._parse_vmess,
+            ProxyType.VLESS: ProxyParser._parse_vless,
+            ProxyType.TROJAN: ProxyParser._parse_trojan,
+            ProxyType.SSH: ProxyParser._parse_ssh
+        }
         
-        # 验证SS加密方法
-        if proxy_type == 'ss':
-            method = settings.get('method', '').lower()
-            if not method:
-                raise ValueError("Missing encryption method for SS proxy")
-            if method not in SUPPORTED_SS_METHODS and method not in LEGACY_SS_METHODS:
-                raise ValueError(f"Unknown encryption method: {method}")
-    
-    def __str__(self) -> str:
-        """返回代理的字符串表示"""
-        return f"{self.proxy_type.upper()}://{self.server}:{self.port}"
-    
-    def __repr__(self) -> str:
-        """返回代理的详细表示"""
-        settings_str = ', '.join(
-            f"{k}={v}" for k, v in self.settings.items() 
-            if k not in ['password', 'id', 'uuid'] and v
-        )
-        return f"Proxy({self.proxy_type}, {self.server}:{self.port}, {settings_str})"
-    
-    def __eq__(self, other) -> bool:
-        """判断两个代理是否相等"""
-        if not isinstance(other, Proxy):
-            return False
-        return self.raw_link == other.raw_link
-    
-    def __hash__(self) -> int:
-        """返回代理的哈希值"""
-        return hash(self.raw_link)
-    
-    def get_tag(self) -> str:
-        """返回代理的标签"""
-        if self.proxy_type == 'ss':
-            method = self.settings.get('method', '')
-            return f"SS-{method}-{self.server}:{self.port}"
-        elif self.proxy_type == 'vmess':
-            return f"VMess-{self.server}:{self.port}"
-        elif self.proxy_type == 'vless':
-            flow = self.settings.get('flow', '')
-            flow_tag = f"-{flow}" if flow else ""
-            return f"VLESS{flow_tag}-{self.server}:{self.port}"
-        elif self.proxy_type == 'trojan':
-            return f"Trojan-{self.server}:{self.port}"
-        elif self.proxy_type == 'ssh':
-            user = self.settings.get('username', '')
-            return f"SSH-{user}@{self.server}:{self.port}"
-        return f"{self.proxy_type.upper()}-{self.server}:{self.port}"
-    
-    def is_valid(self) -> bool:
-        """检查代理配置是否有效"""
+        parser = parser_map.get(proxy_type)
+        if not parser:
+            raise ValueError(f"No parser found for type: {proxy_type}")
+            
         try:
-            if not self.server or not self.port:
-                return False
-                
-            if self.proxy_type == 'ss':
-                return bool(
-                    self.settings.get('method') and 
-                    self.settings.get('password')
-                )
-            elif self.proxy_type == 'vmess':
-                return bool(self.settings.get('id'))
-            elif self.proxy_type == 'vless':
-                return bool(self.settings.get('uuid'))
-            elif self.proxy_type == 'trojan':
-                return bool(self.settings.get('password'))
-            elif self.proxy_type == 'ssh':
-                return bool(
-                    self.settings.get('username') and 
-                    (self.settings.get('password') or self.settings.get('private_key'))
-                )
-            return False
-            
-        except Exception:
-            return False
-    
-    def get_security_info(self) -> Optional[str]:
-        """获取安全传输信息"""
-        security = self.settings.get('security', 'none')
-        if security == 'tls':
-            return f"TLS({self.settings.get('sni', '')})"
-        elif security == 'reality':
-            return f"Reality({self.settings.get('sni', '')})"
-        return None
-    
-    def clean_settings(self) -> None:
-        """清理代理设置中的特殊字符"""
-        cleaned_settings = {}
-        for key, value in self.settings.items():
-            if isinstance(value, str):
-                cleaned_settings[key] = StringCleaner.clean_value(value, key)
-            else:
-                cleaned_settings[key] = value
-        self.settings = cleaned_settings
-    
-    def to_glider_url(self) -> Optional[str]:
-        """转换为Glider URL格式"""
-        try:
-            if self.proxy_type == 'ss':
-                method = self.settings['method'].lower()
-                if method not in SUPPORTED_SS_METHODS:
-                    if method in LEGACY_SS_METHODS:
-                        return None  # 不支持旧的加密方法
-                    # 尝试使用原始方法名
-                    return f"ss://{method}:{self.settings['password']}@{self.server}:{self.port}"
-                return f"ss://{SUPPORTED_SS_METHODS[method]}:{self.settings['password']}@{self.server}:{self.port}"
-                
-            elif self.proxy_type == 'vmess':
-                # 获取加密方式
-                security = self.settings.get('security', 'auto')
-                if security not in VMESS_METHODS:
-                    security = 'auto'
-                security = VMESS_METHODS[security]
-                
-                # 构建基本URL
-                base_url = f"vmess://{security}:{self.settings['id']}@{self.server}:{self.port}"
-                
-                # 添加alterID参数（如果不为0）
-                aid = self.settings.get('aid', '0')
-                if aid and aid != '0':
-                    base_url = f"{base_url}?alterID={aid}"
-                
-                # 获取传输协议
-                net = self.settings.get('type', 'tcp')
-                if net not in VMESS_NETWORKS:
-                    net = 'tcp'
-                net = VMESS_NETWORKS[net]
-                
-                # WebSocket设置
-                if net == 'ws':
-                    # 构建WebSocket URL
-                    ws_url = f"ws://{self.server}:{self.port}"
-                    ws_params = []
-                    
-                    path = self.settings.get('path', '')
-                    if path:
-                        if path.startswith('/'):
-                            path = path[1:]
-                        ws_params.append(f"path={path}")
-                        
-                    host = self.settings.get('host', '')
-                    if host:
-                        ws_params.append(f"host={host}")
-                    
-                    if ws_params:
-                        ws_url += "?" + "&".join(ws_params)
-                    
-                    # TLS设置
-                    if self.settings.get('tls') == 'tls':
-                        tls_url = f"tls://{self.server}:{self.port}"
-                        tls_params = []
-                        if self.settings.get('sni'):
-                            tls_params.append(f"serverName={self.settings['sni']}")
-                        if self.settings.get('allowInsecure', '1') == '1':
-                            tls_params.append("skipVerify=true")
-                        if self.settings.get('alpn'):
-                            alpns = self.settings['alpn'].split(',')
-                            for alpn in alpns:
-                                alpn = alpn.strip()
-                                if alpn:
-                                    tls_params.append(f"alpn={alpn}")
-                        if tls_params:
-                            tls_url += "?" + "&".join(tls_params)
-                        return f"{tls_url},{ws_url},{base_url}"
-                    else:
-                        return f"{ws_url},{base_url}"
-                
-                # 其他传输协议
-                else:
-                    # TLS设置
-                    if self.settings.get('tls') == 'tls':
-                        tls_url = f"tls://{self.server}:{self.port}"
-                        tls_params = []
-                        if self.settings.get('sni'):
-                            tls_params.append(f"serverName={self.settings['sni']}")
-                        if self.settings.get('allowInsecure', '1') == '1':
-                            tls_params.append("skipVerify=true")
-                        if self.settings.get('alpn'):
-                            alpns = self.settings['alpn'].split(',')
-                            for alpn in alpns:
-                                alpn = alpn.strip()
-                                if alpn:
-                                    tls_params.append(f"alpn={alpn}")
-                        if tls_params:
-                            tls_url += "?" + "&".join(tls_params)
-                        return f"{tls_url},{base_url}"
-                    
-                    return base_url
-                
-            elif self.proxy_type == 'trojan':
-                # 检查是否使用TLS
-                if self.settings.get('security') == 'tls' or self.settings.get('tls') == 'tls':
-                    # 使用tls+trojanc的组合
-                    tls_params = []
-                    if self.settings.get('sni'):
-                        tls_params.append(f"serverName={self.settings['sni']}")
-                    if self.settings.get('allowInsecure', '1') == '1':
-                        tls_params.append("skipVerify=true")
-                    
-                    # 处理alpn参数
-                    if self.settings.get('alpn'):
-                        alpns = self.settings['alpn'].split(',')
-                        # 为每个alpn值添加单独的参数
-                        for alpn in alpns:
-                            alpn = alpn.strip()
-                            if alpn:  # 确保不是空字符串
-                                tls_params.append(f"alpn={alpn}")
-                    
-                    tls_url = f"tls://{self.server}:{self.port}"
-                    if tls_params:
-                        tls_url += "?" + "&".join(tls_params)
-                    
-                    trojan_url = f"trojanc://{self.settings['password']}@{self.server}:{self.port}"
-                    return f"{tls_url},{trojan_url}"
-                else:
-                    # 不使用TLS的情况
-                    return f"trojanc://{self.settings['password']}@{self.server}:{self.port}"
-                
-            elif self.proxy_type == 'vless':
-                # VLESS现在支持了
-                return f"vless://{self.settings['uuid']}@{self.server}:{self.port}"
-                
-            elif self.proxy_type == 'ssh':
-                # SSH配置保持不变
-                url = f"ssh://{self.settings['username']}"
-                if self.settings.get('password'):
-                    url += f":{self.settings['password']}"
-                url += f"@{self.server}:{self.port}"
-                
-                params = []
-                if self.settings.get('private_key'):
-                    params.append(f"key={self.settings['private_key']}")
-                if self.settings.get('private_key_password'):
-                    params.append(f"key_password={self.settings['private_key_password']}")
-                for key, value in self.settings.get('options', {}).items():
-                    params.append(f"ssh_{key}={value}")
-                
-                if params:
-                    url += "?" + "&".join(params)
-                return url
-            
-            return None
-            
+            proxy_info = parser(raw_link)
+            # 添加通用字段，使用proxy_protocol来存储代理类型
+            proxy_info.update({
+                "proxy_protocol": proxy_type,  # 改用proxy_protocol存储代理协议类型
+                "raw_link": raw_link,
+                "name": proxy_info.get("name", ""),
+                "server": proxy_info.get("server", ""),
+                # 端口处理：SSH保持字符串，其他转为整数
+                "port": proxy_info.get("port", "22") if proxy_type == ProxyType.SSH else proxy_info.get("port", 0)
+            })
+            return proxy_info
         except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"Failed to generate glider URL: {str(e)}")
-            return None
+            raise ValueError(f"Failed to parse {proxy_type} link: {str(e)}")
+
+    @staticmethod
+    def _get_proxy_type(raw_link: str) -> Optional[ProxyType]:
+        """获取代理类型"""
+        if raw_link.startswith("ss://"):
+            return ProxyType.SS
+        elif raw_link.startswith("ssr://"):
+            return ProxyType.SSR
+        elif raw_link.startswith("vmess://"):
+            return ProxyType.VMESS
+        elif raw_link.startswith("vless://"):
+            return ProxyType.VLESS
+        elif raw_link.startswith("trojan://"):
+            return ProxyType.TROJAN
+        elif raw_link.startswith("ssh://"):
+            return ProxyType.SSH
+        return None
+
+    @staticmethod
+    def _parse_ss(raw_link: str) -> Dict[str, Any]:
+        """解析 Shadowsocks 链接"""
+        # 移除前缀
+        content = raw_link[5:]
+        
+        # 处理 SIP002 格式
+        if "@" in content:
+            # 示例: ss://YWVzLTEyOC1nY206dGVzdA@192.168.100.1:8888#Example
+            if "#" in content:
+                content, name = content.split("#", 1)
+            else:
+                name = ""
+                
+            user_info, server_info = content.split("@", 1)
+            
+            # 解码用户信息
+            try:
+                user_info = base64.urlsafe_b64decode(user_info + "=" * (-len(user_info) % 4)).decode()
+            except:
+                # 可能已经是解码后的格式
+                pass
+                
+            method, password = user_info.split(":", 1)
+            
+            # 处理服务器信息，考虑可能存在的插件参数
+            if "/?" in server_info:
+                server_port, plugin_info = server_info.split("/?", 1)
+            else:
+                server_port = server_info
+                plugin_info = ""
+                
+            server, port = server_port.split(":", 1)
+            
+            # 如果端口后还有其他内容，只取端口部分
+            port = port.split("/")[0]
+            
+        # 处理传统格式
+        else:
+            # 示例: ss://YWVzLTEyOC1nY206dGVzdEAxOTIuMTY4LjEwMC4xOjg4ODg#Example
+            if "#" in content:
+                content, name = content.split("#", 1)
+            else:
+                name = ""
+                
+            try:
+                content = base64.urlsafe_b64decode(content + "=" * (-len(content) % 4)).decode()
+            except:
+                raise ValueError("Invalid base64 encoding")
+                
+            method, rest = content.split(":", 1)
+            password, server_info = rest.split("@", 1)
+            server, port = server_info.split(":", 1)
+            
+        return {
+            "name": urllib.parse.unquote(name),
+            "server": server,
+            "port": int(port),  # 转换为整数
+            "method": method,
+            "password": password,
+            # 默认值
+            "udp": True,
+            "plugin": "",
+            "plugin_opts": ""
+        }
+
+    @staticmethod
+    def _parse_ssr(raw_link: str) -> Dict[str, Any]:
+        """解析 ShadowsocksR 链接"""
+        # 移除前缀
+        content = raw_link[6:]
+        
+        try:
+            content = base64.urlsafe_b64decode(content + "=" * (-len(content) % 4)).decode()
+        except:
+            raise ValueError("Invalid base64 encoding")
+            
+        # 解析主要部分和参数部分
+        if "?" in content:
+            main_part, params_str = content.split("?", 1)
+        else:
+            main_part, params_str = content, ""
+            
+        # 解析主要部分
+        parts = main_part.split(":", 5)
+        if len(parts) != 6:
+            raise ValueError("Invalid SSR link format")
+            
+        server, port, protocol, method, obfs, password_b64 = parts
+        
+        try:
+            # 修改这里：移除密码中的填充字符
+            password = base64.urlsafe_b64decode(password_b64 + "=" * (-len(password_b64) % 4)).decode().rstrip('\x0f')
+        except:
+            raise ValueError("Invalid password encoding")
+            
+        # 解析参数
+        params = {}
+        if params_str:
+            for item in params_str.split("&"):
+                if "=" in item:
+                    k, v = item.split("=", 1)
+                    try:
+                        params[k] = base64.urlsafe_b64decode(v + "=" * (-len(v) % 4)).decode()
+                    except:
+                        params[k] = v
+                        
+        return {
+            "name": params.get("remarks", ""),
+            "server": server,
+            "port": int(port),  # 转换为整数
+            "method": method,
+            "password": password,
+            "protocol": protocol,
+            "protocol_param": params.get("protoparam", ""),
+            "obfs": obfs,
+            "obfs_param": params.get("obfsparam", ""),
+            # 默认值
+            "udp": True
+        }
+
+    @staticmethod
+    def _parse_vmess(raw_link: str) -> Dict[str, Any]:
+        """解析 VMess 链接"""
+        # 移除前缀
+        content = raw_link[8:]
+        
+        try:
+            content = base64.urlsafe_b64decode(content + "=" * (-len(content) % 4)).decode()
+            config = json.loads(content)
+        except:
+            raise ValueError("Invalid VMess link format")
+            
+        # 提取信息并确保aid是整数
+        return {
+            "name": config.get("ps", ""),
+            "server": config.get("add", ""),
+            "port": int(config.get("port", 0)),  # 转换为整数
+            "id": config.get("id", ""),
+            "aid": int(config.get("aid", 0)),
+            "type": config.get("net", "tcp"),  # 使用net字段作为传输类型
+            "host": config.get("host", ""),
+            "path": config.get("path", ""),
+            "security": "tls" if config.get("tls") == "tls" else "",
+            "sni": config.get("sni", ""),
+            "encryption": config.get("scy", "auto"),
+            "flow": config.get("flow", ""),
+            "alpn": config.get("alpn", []),
+            "fingerprint": config.get("fp", ""),
+            "publicKey": config.get("pbk", ""),
+            "shortId": config.get("sid", ""),
+            "spiderX": config.get("spx", "")
+        }
+
+    @staticmethod
+    def _parse_vless(raw_link: str) -> Dict[str, Any]:
+        """解析 VLESS 链接"""
+        # 移除前缀
+        content = raw_link[8:]
+        
+        # 分离名称
+        if "#" in content:
+            content, name = content.split("#", 1)
+            name = urllib.parse.unquote(name)
+        else:
+            name = ""
+            
+        # 分离用户信息和服务器信息
+        if "@" not in content:
+            raise ValueError("Invalid VLESS link format")
+            
+        user_info, server_info = content.split("@", 1)
+        
+        # 分离服务器和端口
+        if ":" not in server_info:
+            raise ValueError("Invalid server address format")
+            
+        server, port = server_info.split(":", 1)
+        if "?" in port:
+            port, params_str = port.split("?", 1)
+        else:
+            params_str = ""
+            
+        # 解析参数
+        params = {}
+        if params_str:
+            params = dict(urllib.parse.parse_qsl(params_str))
+            
+        return {
+            "name": name,
+            "server": server,
+            "port": int(port),  # 转换为整数
+            "id": user_info,
+            "flow": params.get("flow", ""),
+            "encryption": params.get("encryption", "none"),
+            "security": params.get("security", ""),
+            "sni": params.get("sni", ""),
+            "fp": params.get("fp", ""),
+            "type": params.get("type", "tcp"),
+            "host": params.get("host", ""),
+            "path": params.get("path", ""),
+            "headerType": params.get("headerType", ""),
+            # 添加fallback参数
+            "fallback": params.get("fallback", ""),
+            # 默认值
+            "alpn": params.get("alpn", "").split(",") if params.get("alpn") else [],
+            "publicKey": params.get("pbk", ""),
+            "shortId": params.get("sid", ""),
+            "spiderX": params.get("spx", "")
+        }
+
+    @staticmethod
+    def _parse_trojan(raw_link: str) -> Dict[str, Any]:
+        """解析 Trojan 链接"""
+        # 移除前缀
+        content = raw_link[9:]
+        
+        # 分离名称
+        if "#" in content:
+            content, name = content.split("#", 1)
+            name = urllib.parse.unquote(name)
+        else:
+            name = ""
+            
+        # 分离密码和服务器信息
+        if "@" not in content:
+            raise ValueError("Invalid Trojan link format")
+            
+        password, server_info = content.split("@", 1)
+        
+        # 分离服务器和端口
+        if ":" not in server_info:
+            raise ValueError("Invalid server address format")
+            
+        server, port = server_info.split(":", 1)
+        if "?" in port:
+            port, params_str = port.split("?", 1)
+        else:
+            params_str = ""
+            
+        # 解析参数
+        params = {}
+        if params_str:
+            params = dict(urllib.parse.parse_qsl(params_str))
+            
+        return {
+            "name": name,
+            "server": server,
+            "port": int(port),  # 转换为整数
+            "password": password,
+            # 修改这里：只在明确指定时才设置TLS
+            "security": params.get("security", ""),  # 不再默认为tls
+            "sni": params.get("sni", ""),
+            "type": params.get("type", "tcp"),
+            "host": params.get("host", ""),
+            "path": params.get("path", ""),
+            # 添加allowInsecure参数
+            "allowInsecure": params.get("allowInsecure", "0"),
+            # 默认值
+            "alpn": params.get("alpn", "").split(",") if params.get("alpn") else [],
+            "fingerprint": params.get("fp", ""),
+            "skipVerify": params.get("allowInsecure", "0") == "1",
+            "udp": True
+        }
+
+    @staticmethod
+    def _parse_ssh(raw_link: str) -> Dict[str, Any]:
+        """解析 SSH 链接"""
+        # 移除前缀
+        content = raw_link[6:]
+        
+        # 分离服务器信息和参数
+        if "?" in content:
+            server_info, params_str = content.split("?", 1)
+        else:
+            server_info, params_str = content, ""
+            
+        # 解析用户名、密码和服务器信息
+        if "@" in server_info:
+            auth_info, host_info = server_info.split("@", 1)
+            if ":" in auth_info:
+                username, password = auth_info.split(":", 1)
+            else:
+                username, password = auth_info, ""
+        else:
+            username, password = "", ""
+            host_info = server_info
+            
+        # 解析服务器和端口
+        if ":" in host_info:
+            server, port = host_info.split(":", 1)
+        else:
+            server, port = host_info, "22"
+            
+        # 解析参数
+        params = {}
+        if params_str:
+            params = dict(urllib.parse.parse_qsl(params_str))
+            
+        return {
+            "name": params.get("name", ""),
+            "server": server,
+            "port": port,  # 保持端口为字符串，因为测试期望它是字符串
+            "username": username,
+            "password": password,
+            "private_key": params.get("key", ""),
+            "key_password": params.get("key_password", ""),
+            "ssh_options": {k[4:]: v for k, v in params.items() if k.startswith("ssh_")}
+        } 

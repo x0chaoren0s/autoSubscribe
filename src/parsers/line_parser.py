@@ -1,69 +1,43 @@
-from typing import List, Optional
+from typing import List
 from .base_parser import BaseParser
-from .protocols.protocol_parser_factory import ProtocolParserFactory
-from ..models.proxy import Proxy
-from ..utils.constants import SUPPORTED_PROTOCOLS
-# 导入协议模块以确保注册
-from .protocols import *
 
 class LineParser(BaseParser):
-    """按行解析代理链接的解析器"""
+    """行解析器 - 用于解析按行分隔的订阅内容"""
     
-    def parse(self, content: str) -> List[Proxy]:
-        """
-        解析内容并返回代理列表
-        
-        Args:
-            content: 要解析的内容
-            
-        Returns:
-            List[Proxy]: 解析出的代理列表
-        """
-        proxies = []
-        error_counts = {}  # 记录每种错误的出现次数
-        
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
+    def parse(self, content: str) -> List[str]:
+        """解析按行分隔的内容为代理链接列表"""
+        try:
+            lines = []
+            for line in content.splitlines():
+                line = line.strip()
                 
-            try:
-                parser = ProtocolParserFactory.create_parser(line)
-                proxy = parser.parse(line)
-                if proxy and proxy.is_valid():
-                    # 清理代理设置
-                    proxy.clean_settings()
-                    proxies.append(proxy)
-            except Exception as e:
-                # 记录错误次数
-                error_msg = f"Error parsing line: {str(e)}"
-                error_counts[error_msg] = error_counts.get(error_msg, 0) + 1
-        
-        # 在最后统一输出错误信息
-        if error_counts and self.logger:
-            for error_msg, count in error_counts.items():
-                self.logger.debug(f"Failed to parse {count} links: {error_msg}")
-        
-        return proxies
-    
-    @classmethod
-    def can_parse(cls, content: str) -> bool:
-        """
-        判断是否可以解析该内容
-        
-        Args:
-            content: 要判断的内容
+                # 1. 跳过空行和纯注释行
+                if not line or line.startswith('#'):
+                    continue
+                
+                # 2. 如果有空格，在第一个空格处截断
+                if ' ' in line:
+                    line = line.split(None, 1)[0]
+                
+                # 3. 如果没有空格但有多个#，只保留到第二个#之前的部分
+                elif line.count('#') > 1:
+                    protocol_part = line.split('://', 1)
+                    if len(protocol_part) == 2:
+                        protocol, rest = protocol_part
+                        # 找到第二个#的位置
+                        first_hash = rest.find('#')
+                        if first_hash != -1:
+                            second_hash = rest.find('#', first_hash + 1)
+                            if second_hash != -1:
+                                line = f"{protocol}://{rest[:second_hash]}"
+                
+                # 4. 验证是否是有效的代理链接
+                if "://" not in line:
+                    continue
+                
+                lines.append(line)
+                    
+            return lines
             
-        Returns:
-            bool: 如果内容包含任何支持的协议前缀则返回True
-        """
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            # 检查是否包含任何支持的协议前缀
-            for protocol in SUPPORTED_PROTOCOLS:
-                if line.startswith(f"{protocol}://"):
-                    return True
-        return False
+        except Exception as e:
+            raise ValueError(f"Invalid content format: {str(e)}")

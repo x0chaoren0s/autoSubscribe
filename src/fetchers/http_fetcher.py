@@ -1,75 +1,66 @@
 import aiohttp
-import asyncio
-from typing import Optional, Dict
+import os
+from typing import Optional
 from .base_fetcher import BaseFetcher
 
 class HttpFetcher(BaseFetcher):
-    """HTTP订阅源获取器"""
+    """HTTP获取器"""
     
-    def __init__(self, logger=None, config: Dict = None):
-        super().__init__(logger, config)
-        self._session: Optional[aiohttp.ClientSession] = None
-        self.proxy = self.get_config('proxy')  # 可选的代理设置
-    
-    async def _get_session(self) -> aiohttp.ClientSession:
-        """获取或创建HTTP会话"""
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-                headers={
-                    'User-Agent': self.user_agent,
-                    'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Connection': 'keep-alive'
-                }
-            )
-        return self._session
-    
-    async def fetch(self, url: str) -> str:
-        """获取订阅内容"""
-        session = await self._get_session()
+    def __init__(self, logger=None, connect_timeout: int = 10, max_retries: int = 3, proxy: Optional[dict] = None):
+        super().__init__(logger)
+        self.connect_timeout = connect_timeout
+        self.max_retries = max_retries
+        self.proxy = proxy
         
-        for attempt in range(self.retry_times):
+    async def fetch(self, url: str) -> Optional[str]:
+        """获取URL内容
+        
+        支持:
+        - HTTP/HTTPS URL
+        - 本地文件路径（相对于项目根目录）
+        """
+        # 检查是否是本地文件
+        if not url.startswith(('http://', 'https://')):
             try:
-                async with session.get(
-                    url,
-                    proxy=self.proxy,
-                    timeout=aiohttp.ClientTimeout(total=self.timeout),
-                    allow_redirects=True,
-                    verify_ssl=not self.get_config('skip_ssl_verify', False)
-                ) as response:
-                    if response.status != 200:
-                        raise aiohttp.ClientError(
-                            f"HTTP {response.status}: {response.reason}"
-                        )
-                    
-                    content = await response.text()
-                    if not content.strip():
-                        raise ValueError("Empty response received")
-                    
-                    if self.logger:
-                        self.logger.debug(f"Fetched content length: {len(content)}")
-                        self.logger.debug(f"First 100 characters: {content[:100]}")
-                    
-                    return content
-                    
+                # 尝试作为相对路径读取
+                with open(url, 'r', encoding='utf-8') as f:
+                    return f.read()
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
-                if attempt == self.retry_times - 1:
-                    raise
+                    self.logger.debug(f"Failed to read local file {url}: {str(e)}")
+                return None
+        
+        # HTTP/HTTPS URL
+        for i in range(self.max_retries + 1):
+            try:
+                # 配置代理
+                proxy = None
+                if self.proxy and self.proxy.get("enabled"):
+                    proxy = self.proxy.get("url")
                 
-                wait_time = 2 ** attempt
-                if self.logger:
-                    self.logger.debug(f"Waiting {wait_time}s before retry")
-                await asyncio.sleep(wait_time)
-    
-    async def close(self):
-        """关闭HTTP会话"""
-        if self._session and not self._session.closed:
-            await self._session.close()
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """异步上下文管理器出口"""
-        await self.close()
+                # 创建会话
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        url,
+                        timeout=aiohttp.ClientTimeout(total=self.connect_timeout),
+                        proxy=proxy,
+                        ssl=False  # 忽略SSL证书验证
+                    ) as response:
+                        if response.status == 200:
+                            content = await response.text()
+                            if content:
+                                return content
+                            if self.logger:
+                                self.logger.debug(f"Empty response from {url}")
+                        else:
+                            if self.logger:
+                                self.logger.debug(f"HTTP {response.status} from {url}")
+                            continue
+            except Exception as e:
+                if i == self.max_retries:
+                    if self.logger:
+                        self.logger.debug(f"Failed to fetch {url}: {str(e)}")
+                    return None
+                continue
+        return None
     

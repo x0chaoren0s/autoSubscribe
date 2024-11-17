@@ -1,0 +1,138 @@
+# 代理过滤配置
+
+# 订阅源配置
+subscription:
+  urls:
+    - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub1.txt"
+    - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub2.txt"
+    - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub3.txt"
+    - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub4.txt"
+    - "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub5.txt"
+    - "https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/server.txt"
+    - "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"
+    # - tests/data/test_subscription.txt
+  fetcher:
+    timeout: 10
+    retry_times: 3
+    proxy:
+      enabled: false
+      url: "http://172.30.160.1:7604"
+
+# 目标站点配置
+target_hosts:
+  "google":
+    check_url: "http://www.google.com"
+  "youtube":
+    check_url: "http://www.youtube.com"
+  "google":
+    check_url: "http://googlevideo.com"
+  "github":
+    check_url: "https://github.com"
+  "pixiv":
+    check_url: "https://pixiv.net/"
+  "nhentai":
+    check_url: "https://nhentai.net/"
+  "pornhub":
+    check_url: "https://cn.pornhub.com/"
+  "xnxx":
+    check_url: "https://www.xnxx.com/"
+  "r34":
+    check_url: "https://rule34video.com/"
+  "iwara":
+    check_url: "https://www.iwara.tv/"
+  "eh":
+    check_url: "https://e-hentai.org/"
+
+# 测试器配置
+testers:
+  # 基本配置
+  basic:
+    concurrent_tests: 10  # 并发测试数
+    
+  # TCP测试器
+  tcp_tester:
+    enabled: true
+    connect_timeout: 5
+    retry_times: 2
+  
+  # SSH测试器
+  ssh_tester:
+    enabled: false
+    connect_timeout: 5
+    retry_times: 2
+  
+  # Xray测试器
+  xray_tester:
+    enabled: false
+    connect_timeout: 10
+    retry_times: 2
+    xray_path: "xray"
+  
+  # Glider测试器
+  glider_tester:
+    enabled: true
+    connect_timeout: 10
+    retry_times: 2
+    glider_path: "glider"
+    check_interval: 30
+    check_timeout: 10
+    max_failures: 3
+
+# 输出配置
+output:
+  dir: "results"
+  backup:
+    enabled: true
+    dir: "results/backup"
+    max_backups: 10
+
+# 代理协议配置
+protocols:
+  # Shadowsocks配置
+  ss:
+    # 支持的加密方法
+    methods:
+      - "aes-128-gcm"
+      - "aes-256-gcm"
+      - "chacha20-poly1305"
+      - "chacha20-ietf-poly1305"
+      - "xchacha20-poly1305"
+      - "2022-blake3-aes-128-gcm"
+      - "2022-blake3-aes-256-gcm"
+      - "2022-blake3-chacha20-poly1305"
+  
+  # VMess配置
+  vmess:
+    # 支持的传输协议
+    transports:
+      - "tcp"
+      - "ws"
+      - "http"
+      - "h2"
+      - "grpc"
+      - "quic"
+    # 支持的加密方法
+    securities:
+      - "zero"
+      - "none"
+      - "aes-128-gcm"
+      - "chacha20-poly1305"
+  
+  # VLESS配置
+  vless:
+    # 支持的传输协议
+    transports:
+      - "tcp"
+      - "ws"
+      - "http"
+      - "h2"
+      - "grpc"
+      - "quic"
+  
+  # Trojan配置
+  trojan:
+    # 支持的传输协议
+    transports:
+      - "tcp"
+      - "ws"
+  

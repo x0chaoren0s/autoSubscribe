@@ -1,0 +1,9 @@
+# Rules for pixiv
+domain=pixiv.net
+strategy=lha
+check=https://pixiv.net/
+checkinterval=30
+
+forward=ss://chacha20-ietf-poly1305:fSEPtYDmuBu7ZnFYXdHMt1@89.185.84.185:12575
+forward=ss://chacha20-ietf-poly1305:Fd2zvd70MYxXQIZbZBNbL3@45.155.249.178:29746
+forward=ss://chacha20-ietf-poly1305:3MgIhqwp4pjM8SKwixNkYZ@193.124.22.253:33068
