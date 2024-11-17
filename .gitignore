@@ -55,6 +55,7 @@ coverage.xml
 
 # pytest缓存
 .pytest_cache/
+autosubscribe.egg-info/
 
 # 其他临时文件
 *.log
