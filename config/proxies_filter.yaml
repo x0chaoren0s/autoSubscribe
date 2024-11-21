@@ -15,17 +15,17 @@ subscription:
     timeout: 10
     retry_times: 3
     proxy:
-      enabled: false
-      url: "http://172.30.160.1:7604"
+      enabled: true
+      url: "http://127.0.0.1:7630"
 
 # 目标站点配置
 target_hosts:
   "google":
-    check_url: "http://www.google.com"
+    check_url: "https://www.google.com"
   "youtube":
-    check_url: "http://www.youtube.com"
+    check_url: "https://www.youtube.com"
   "google":
-    check_url: "http://googlevideo.com"
+    check_url: "https://googlevideo.com"
   "github":
     check_url: "https://github.com"
   "pixiv":
@@ -80,10 +80,10 @@ testers:
 
 # 输出配置
 output:
-  dir: "results"
+  dir: "results/output"
   backup:
     enabled: true
-    dir: "results/backup"
+    dir: "results/output/backup"
     max_backups: 10
 
 # 代理协议配置

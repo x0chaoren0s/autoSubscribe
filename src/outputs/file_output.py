@@ -6,7 +6,7 @@ from datetime import datetime
 class FileOutput:
     """文件输出处理器"""
     
-    def __init__(self, logger=None, output_dir="results", backup_dir="results/backup", config=None):
+    def __init__(self, logger=None, output_dir="results/output", backup_dir="results/output/backup", config=None):
         self.logger = logger
         self.output_dir = output_dir
         self.backup_dir = backup_dir

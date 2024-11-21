@@ -1,15 +1,19 @@
 # 代理结果文件配置
 proxy_results:
   # 站点名称: 结果文件路径
-  "google": "results/google.txt"
-  "github": "results/github.txt"
-  "pixiv": "results/pixiv.txt" 
-  "nhentai": "results/nhentai.txt"
-  "pornhub": "results/pornhub.txt"
-  "xnxx": "results/xnxx.txt"
-  # "r34": "results/r34.txt"
-  # "iwara": "results/iwara.txt"
-  # "eh": "results/eh.txt"
+  "google": "results/output/google.txt"
+  "github": "results/output/github.txt"
+  "pixiv": "results/output/pixiv.txt" 
+  "nhentai": "results/output/nhentai.txt"
+  "pornhub": "results/output/pornhub.txt"
+  "xnxx": "results/output/xnxx.txt"
+  # "r34": "results/output/r34.txt"
+  # "iwara": "results/output/iwara.txt"
+  # "eh": "results/output/eh.txt"
+
+# 输出配置
+output:
+  dir: "results/configs"
 
 # 目标站点配置
 target_hosts:

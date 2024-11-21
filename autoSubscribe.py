@@ -513,8 +513,10 @@ async def generate_glider_config(logger: Logger):
             client_config=client_config
         )
         
+        config_dir = Path(client_config['output']['dir'])
+
         # 创建规则文件目录
-        rules_dir = Path('config/rules.d')
+        rules_dir = config_dir/'rules.d'
         rules_dir.mkdir(parents=True, exist_ok=True)
         
         # 生成规则文件
@@ -531,7 +533,7 @@ async def generate_glider_config(logger: Logger):
             logger.debug(f"Rule file saved to: {rule_file}")
         
         # 保存主配置文件
-        glider_config_file = Path('config/glider.conf')
+        glider_config_file = config_dir/'glider.conf'
         with open(glider_config_file, 'w', encoding='utf-8') as f:
             f.write(glider_config)
         
@@ -559,10 +561,7 @@ async def generate_glider_config(logger: Logger):
         site_config = client_config['target_hosts'].get(site, {})
         display_name = site_config.get('display_name', site)
         logger.info(f"  1. {site:<15} -> {display_name} proxies ({len(proxies)} available)")
-    logger.info("  2. geosite:category-ads-all -> Block")
-    logger.info("  3. geosite:cn          -> Direct connection")
-    logger.info("  4. geoip:cn            -> Direct connection")
-    logger.info("  5. Other traffic       -> All proxies combined")
+    logger.info("  2. Other traffic       -> All proxies combined")
     
     # 显示代理统计
     logger.info("\nProxy distribution:")
