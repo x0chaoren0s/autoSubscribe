@@ -8,6 +8,8 @@ tmp/*
 
 # 备份文件夹
 results/
+results/configs/
+results/output/
 results_bak/
 results_bak2/
 

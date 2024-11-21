@@ -612,13 +612,17 @@ def main():
     logger = Logger()
     
     try:
+        need_print_help = True
         if args.filter_subscriptions:
             asyncio.run(filter_subscriptions(logger))
-        elif args.generate_xray_config:
+            need_print_help = False
+        if args.generate_xray_config:
             asyncio.run(generate_xray_config(logger))
-        elif args.generate_glider_config:
+            need_print_help = False
+        if args.generate_glider_config:
             asyncio.run(generate_glider_config(logger))
-        else:
+            need_print_help = False
+        if need_print_help:
             parser.print_help()
             sys.exit(1)
     except KeyboardInterrupt:
