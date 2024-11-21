@@ -1,0 +1,36 @@
+# HTTP请求
+aiohttp
+aiofiles
+
+# YAML配置文件支持
+pyyaml
+
+# 类型提示支持
+typing-extensions
+
+# SSH支持
+asyncssh
+cryptography  # asyncssh的依赖
+
+# DNS解析
+dnspython
+
+# 进度条支持
+tqdm
+
+# 日志格式化
+colorama
+
+# 测试框架（可选）
+pytest
+pytest-cov
+
+# 代码质量工具（可选）
+black
+isort
+flake8
+mypy
+
+# 其他工具
+psutil  # 用于进程管理
+python-dateutil  # 用于日期处理

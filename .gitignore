@@ -7,7 +7,7 @@ tmp/
 tmp/*
 
 # 备份文件夹
-results/backup/
+results/
 results_bak/
 results_bak2/
 
